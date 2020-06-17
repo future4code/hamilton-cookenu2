@@ -1,0 +1,195 @@
+import express, { Request, Response } from "express";
+import dotenv from "dotenv";
+import { AddressInfo } from "net";
+import { IdGenerator } from "./services/IdGenerator";
+import { UserDatabase } from "./data/UserDatabase";
+import { Authenticator } from "./services/Authenticator";
+import { HashManager } from "./services/HashManager";
+import { BaseDatabase } from "./data/BaseDataBase";
+import { RecipeDataBase } from "./data/RecipeDataBase";
+import moment from "moment";
+
+dotenv.config();
+
+const app = express();
+
+app.use(express.json());
+
+app.post("/signup", async (req: Request, res: Response) => {
+  try {
+    if (req.body.name === "") {
+      throw new Error("Preencha o campo name");
+    }
+
+    if (!req.body.email || req.body.email.indexOf("@") === -1) {
+      throw new Error("Invalid email");
+    }
+
+    if (!req.body.password || req.body.password.length < 6) {
+      throw new Error("Invalid password");
+    }
+
+    const userData = {
+      email: req.body.email,
+      name: req.body.name,
+      password: req.body.password,
+    };
+
+    const idGenerator = new IdGenerator();
+    const id = idGenerator.generate();
+
+    const hashManager = new HashManager();
+    const hashPassword = await hashManager.hash(userData.password);
+
+    const userDb = new UserDatabase();
+    await userDb.createUser(id, userData.email, userData.name, hashPassword);
+
+    const authenticator = new Authenticator();
+    const token = authenticator.generateToken({
+      id,
+    });
+
+    res.status(200).send({
+      access_token: token,
+    });
+  } catch (err) {
+    res.status(400).send({
+      message: err.message,
+    });
+  }
+  await BaseDatabase.destroyConnection();
+});
+
+app.post("/login", async (req: Request, res: Response) => {
+  try {
+    if (!req.body.email || req.body.email.indexOf("@") === -1) {
+      throw new Error("Invalid email");
+    }
+
+    const userData = {
+      email: req.body.email,
+      name: req.body.name,
+      password: req.body.password,
+    };
+
+    const userDatabase = new UserDatabase();
+    const user = await userDatabase.getUserByEmail(userData.email);
+
+    if (user.password !== userData.password) {
+      throw new Error("Invalid password");
+    }
+
+    const authenticator = new Authenticator();
+    const token = authenticator.generateToken({
+      id: user.id,
+    });
+
+    res.status(200).send({
+      token,
+    });
+  } catch (err) {
+    res.status(400).send({
+      message: err.message,
+    });
+  }
+  await BaseDatabase.destroyConnection();
+});
+
+app.get("/user/profile", async (req: Request, res: Response) => {
+  try {
+    const token = req.headers.authorization as string;
+
+    const authenticator = new Authenticator();
+    const authenticationData = authenticator.getData(token);
+
+    const userDb = new UserDatabase();
+    const user = await userDb.getUserById(authenticationData.id);
+
+    res.status(200).send({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    });
+  } catch (err) {
+    res.status(400).send({
+      message: err.message,
+    });
+  }
+  await BaseDatabase.destroyConnection();
+});
+
+app.get("/user/:id", async (req: Request, res: Response) => {
+  try {
+    const token = req.headers.authorization as string;
+    const id = req.params.id;
+
+    const authenticator = new Authenticator();
+    authenticator.getData(token);
+
+    const userDb = new UserDatabase();
+    const user = await userDb.getUserById(id);
+
+    res.status(200).send({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+    });
+  } catch (error) {
+    res.status(400).send({
+      message: error.message,
+    });
+  }
+  await BaseDatabase.destroyConnection();
+});
+
+app.post("/recipe", async (req: Request, res: Response) => {
+  try {
+    const token = req.headers.authorization as string;
+
+    const { title, description } = req.body;
+    
+
+    const createDate = moment().format("YYYY-MM-DD");
+
+    const idGenerator = new IdGenerator();
+    const id = idGenerator.generate();
+
+    const authenticator = new Authenticator();
+    authenticator.getData(token);
+
+    const recipeDb = new RecipeDataBase();
+    const recipe = await recipeDb.createRecipe(
+      id,
+      title,
+      description,
+      createDate
+    );
+      
+    if (!title || !description) {
+      res.status(400).send({
+        message: "Preencha todos os campos",
+      });
+    } else {
+      res.status(200).send({
+        title: title,
+        description: description,
+        createDate: createDate,
+      });
+    }
+  } catch (error) {
+    res.status(400).send({
+      message: error.message,
+    });
+    
+  }
+  await BaseDatabase.destroyConnection();
+});
+
+const server = app.listen(process.env.PORT || 3003, () => {
+  if (server) {
+    const address = server.address() as AddressInfo;
+    console.log(`Server is running in http://localhost:${address.port}`);
+  } else {
+    console.error(`Failure upon starting server.`);
+  }
+});

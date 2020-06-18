@@ -95,6 +95,30 @@ app.post("/login", async (req: Request, res: Response) => {
   await BaseDatabase.destroyConnection();
 });
 
+app.post("/user/follow", async (req: Request, res: Response) => {
+  try {
+    const userToFollowId = {
+      id: req.body.id,
+    };
+    const token = req.headers.authorization as string;
+
+    const authenticator = new Authenticator();
+    const follower = authenticator.getData(token);
+
+    const userDatabase = new UserDatabase();
+    await userDatabase.followUserById(userToFollowId.id, follower.id);
+
+    res.status(200).send({
+      message: "Followed successfully",
+    });
+  } catch (error) {
+    res.status(400).send({
+      message: error.message,
+    });
+  }
+  await BaseDatabase.destroyConnection();
+});
+
 app.get("/user/profile", async (req: Request, res: Response) => {
   try {
     const token = req.headers.authorization as string;
@@ -118,6 +142,30 @@ app.get("/user/profile", async (req: Request, res: Response) => {
   await BaseDatabase.destroyConnection();
 });
 
+app.get("/recipe/:id", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
+    const token = req.headers.authorization as string;
+
+    const authenticator = new Authenticator();
+    authenticator.getData(token);
+
+    const recipeDb = new RecipeDataBase();
+    const recipe = await recipeDb.getRecipeById(id);
+
+    res.status(200).send({
+      id: recipe.id,
+      title: recipe.title,
+      description: recipe.description,
+      createDate: recipe.createDate,
+    });
+  } catch (error) {
+    res.status(400).send({
+      message: error.message,
+    });
+  }
+  await BaseDatabase.destroyConnection();
+});
 app.get("/user/:id", async (req: Request, res: Response) => {
   try {
     const token = req.headers.authorization as string;
@@ -147,7 +195,6 @@ app.post("/recipe", async (req: Request, res: Response) => {
     const token = req.headers.authorization as string;
 
     const { title, description } = req.body;
-    
 
     const createDate = moment().format("YYYY-MM-DD");
 
@@ -164,7 +211,7 @@ app.post("/recipe", async (req: Request, res: Response) => {
       description,
       createDate
     );
-      
+
     if (!title || !description) {
       res.status(400).send({
         message: "Preencha todos os campos",
@@ -180,7 +227,6 @@ app.post("/recipe", async (req: Request, res: Response) => {
     res.status(400).send({
       message: error.message,
     });
-    
   }
   await BaseDatabase.destroyConnection();
 });

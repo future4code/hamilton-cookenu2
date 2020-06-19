@@ -33,6 +33,7 @@ app.post("/signup", async (req: Request, res: Response) => {
       email: req.body.email,
       name: req.body.name,
       password: req.body.password,
+      role: req.body.role,
     };
 
     const idGenerator = new IdGenerator();
@@ -42,11 +43,12 @@ app.post("/signup", async (req: Request, res: Response) => {
     const hashPassword = await hashManager.hash(userData.password);
 
     const userDb = new UserDatabase();
-    await userDb.createUser(id, userData.email, userData.name, hashPassword);
+    await userDb.createUser(id, userData.email, userData.name, hashPassword, userData.role);
 
     const authenticator = new Authenticator();
     const token = authenticator.generateToken({
       id,
+      role: userData.role,
     });
 
     res.status(200).send({
@@ -82,6 +84,7 @@ app.post("/login", async (req: Request, res: Response) => {
     const authenticator = new Authenticator();
     const token = authenticator.generateToken({
       id: user.id,
+      role: user.role,
     });
 
     res.status(200).send({
@@ -218,47 +221,7 @@ app.get("/recipe/:id", async (req: Request, res: Response) => {
   await BaseDatabase.destroyConnection();
 });
 */
-/*app.post("/recipe", async (req: Request, res: Response) => {
-  try {
-    const token = req.headers.authorization as string;
 
-    const { title, description } = req.body;
-
-    const createDate = moment().format("YYYY-MM-DD");
-
-    const idGenerator = new IdGenerator();
-    const id = idGenerator.generate();
-
-    const authenticator = new Authenticator();
-    authenticator.getData(token);
-
-    const recipeDb = new RecipeDataBase();
-    const recipe = await recipeDb.createRecipe(
-      id,
-      title,
-      description,
-      createDate
-    );
-
-    if (!title || !description) {
-      res.status(400).send({
-        message: "Preencha todos os campos",
-      });
-    } else {
-      res.status(200).send({
-        title: title,
-        description: description,
-        createDate: createDate,
-      });
-    }
-  } catch (error) {
-    res.status(400).send({
-      message: error.message,
-    });
-  }
-  await BaseDatabase.destroyConnection();
-});
-*/
 app.post("/recipe", async (req: Request, res: Response) => {
   try {
       const token = req.headers.authorization as string;
@@ -301,10 +264,10 @@ app.get("/users/feed", async(req:Request, res:Response) => {
     const authenticator = new Authenticator();
     const payloadAuthor = authenticator.getData(token);
 
-    const receipeFeed = await new UserDatabase().getRecipeFeed(payloadAuthor.id)
+    const recipeFeed = await new UserDatabase().getRecipeFeed(payloadAuthor.id)
 
     console.log(payloadAuthor)
-    res.status(200).send({recipes:[receipeFeed]})
+    res.status(200).send({recipes:[recipeFeed]})
   } catch(err) {
     res.status(400).send({message: err.message || err.mysqlmessage })
   }

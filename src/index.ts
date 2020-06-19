@@ -112,13 +112,41 @@ app.post("/user/follow", async (req: Request, res: Response) => {
       message: "Followed successfully",
     });
   } catch (error) {
-    res.status(400).send({
-      message: error.message,
-    });
+    res.status(400).send({message: error.message});
   }
   await BaseDatabase.destroyConnection();
 });
+app.post("/user/unfollow", async(req:Request, res:Response) => {
 
+  try {
+    const token = req.headers.authorization as string;
+
+    const userToUnfollowId = req.body.id
+
+    if(!token || !userToUnfollowId) {
+
+      throw new Error("Invalid");
+    } 
+    const authenticator = new Authenticator();
+    const follower = authenticator.getData(token);
+
+    const userDatabase = new UserDatabase();
+    const followerId = userDatabase.getUserById(follower.id)
+    
+    if(!followerId) {
+
+      throw new Error("Invalid");
+    }
+    await new UserDatabase().unfollowUserById(userToUnfollowId, follower.id);
+
+    res.status(200).send({message: "Unollowed successfully"});
+
+  } catch (error) {
+
+    res.status(400).send({message: error.message || error.mysqlmessage});
+  }
+  await BaseDatabase.destroyConnection();
+})
 app.get("/user/profile", async (req: Request, res: Response) => {
   try {
     const token = req.headers.authorization as string;
@@ -166,7 +194,7 @@ app.get("/recipe/:id", async (req: Request, res: Response) => {
   }
   await BaseDatabase.destroyConnection();
 });
-app.get("/user/:id", async (req: Request, res: Response) => {
+/*app.get("/user/:id", async (req: Request, res: Response) => {
   try {
     const token = req.headers.authorization as string;
     const id = req.params.id;
@@ -189,8 +217,8 @@ app.get("/user/:id", async (req: Request, res: Response) => {
   }
   await BaseDatabase.destroyConnection();
 });
-
-app.post("/recipe", async (req: Request, res: Response) => {
+*/
+/*app.post("/recipe", async (req: Request, res: Response) => {
   try {
     const token = req.headers.authorization as string;
 
@@ -230,7 +258,59 @@ app.post("/recipe", async (req: Request, res: Response) => {
   }
   await BaseDatabase.destroyConnection();
 });
+*/
+app.post("/recipe", async (req: Request, res: Response) => {
+  try {
+      const token = req.headers.authorization as string;
 
+      const authenticator = new Authenticator;
+      const authorId = authenticator.getData(token);
+
+      const id = new IdGenerator().generate();
+     
+      const createAt = moment().format("DD/MM/YYYY")
+
+      const {title, description} = req.body
+
+      const newRecipe = await new RecipeDataBase().createRecipe(
+          id,
+          title,
+          description,
+          createAt,
+          authorId.id
+      );
+      if (!title || !description) {
+
+        res.status(400).send({ message: "Preencha todos os campos"});
+
+      } else {
+
+        res.status(200).send({title, description});
+      }
+          
+  } catch(err) {
+      res.status(400).send({message: err.message || err.mysqlmessage })
+  }
+})
+
+app.get("/users/feed", async(req:Request, res:Response) => {
+
+  try {
+    const token = req.headers.authorization as string;
+
+    const authenticator = new Authenticator();
+    const payloadAuthor = authenticator.getData(token);
+
+    const receipeFeed = await new UserDatabase().getRecipeFeed(payloadAuthor.id)
+
+    console.log(payloadAuthor)
+    res.status(200).send({recipes:[receipeFeed]})
+  } catch(err) {
+    res.status(400).send({message: err.message || err.mysqlmessage })
+  }
+
+
+})
 const server = app.listen(process.env.PORT || 3003, () => {
   if (server) {
     const address = server.address() as AddressInfo;

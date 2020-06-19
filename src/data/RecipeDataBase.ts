@@ -7,16 +7,20 @@ export class RecipeDataBase extends BaseDatabase {
     id: string,
     title: string,
     description: string,
-    createDate: string
+    createAt: string,
+    author_id:string
   ): Promise<any> {
     await this.getConnection()
       .insert({
         id,
         title,
         description,
-        createDate,
+        createAt,
+        author_id
+        
       })
       .into(RecipeDataBase.TABLE_NAME);
+      await BaseDatabase.destroyConnection();
   }
   public async getRecipeById(id: string): Promise<any> {
     const recipe = await this.getConnection()
@@ -26,4 +30,5 @@ export class RecipeDataBase extends BaseDatabase {
 
     return recipe[0];
   }
+  
 }

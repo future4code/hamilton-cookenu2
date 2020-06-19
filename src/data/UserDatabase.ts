@@ -11,7 +11,8 @@ export class UserDatabase extends BaseDatabase {
     id: string,
     email: string,
     name: string,
-    password: string
+    password: string,
+    role: string
   ): Promise<void> {
     await this.getConnection()
       .insert({
@@ -19,6 +20,7 @@ export class UserDatabase extends BaseDatabase {
         email,
         name,
         password,
+        role
       })
       .into(UserDatabase.TABLE_NAME);
   }
@@ -72,7 +74,6 @@ export class UserDatabase extends BaseDatabase {
        ON cr.author_id = cu.id
        WHERE "${author_id}" = author_id
        ORDER BY cr.createAt DESC
-       
       `
     )
     return recipeFeed[0][0]

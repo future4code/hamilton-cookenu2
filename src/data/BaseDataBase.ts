@@ -2,8 +2,6 @@ import knex from "knex";
 import Knex from "knex";
 
 export abstract class BaseDatabase {
-  
-    private static TABLE_NAMERECIPE = "cookenu_recipe";
 
   private static connection: Knex | null = null;
   protected getConnection(): Knex {

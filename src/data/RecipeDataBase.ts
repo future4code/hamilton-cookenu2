@@ -30,5 +30,51 @@ export class RecipeDataBase extends BaseDatabase {
 
     return recipe[0];
   }
-  
+  public async updateRecipe (
+    id: string,
+    newTitle:string, 
+    newDescription:string) : Promise<void> {
+      
+    await this.getConnection()
+        .update({
+
+          title: newTitle,
+          description: newDescription
+
+        })
+        .from(RecipeDataBase.TABLE_NAME)
+        .where({ id });
+      
+    }
+    public async deleteRecipe(id:string):Promise<void> {
+
+      await this.getConnection()
+      .del()
+      .from(RecipeDataBase.TABLE_NAME)
+      .where({ id })
+
+    }
+    public async deleteRecipeAuthor(author_id:string) : Promise<void> {
+       await this.getConnection()
+      .del()
+      .from(RecipeDataBase.TABLE_NAME)
+      .where({author_id })
+    }
 }
+// const editInfoUser = async(id:string, name:string, nickname:string):Promise<any> => {
+//   try {
+
+//       const result = await connection.raw (
+//           `
+//           UPDATE User
+//           SET name = "${name}", nickname = "${nickname}"
+//           WHERE id = "${id}"
+//           `
+//       )
+//       return (result[0][0])
+
+//   } catch(err) {
+
+//       console.log("\x1b[31m","Erro ao encontrar usuário")
+//   }
+// }

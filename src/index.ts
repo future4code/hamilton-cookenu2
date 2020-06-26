@@ -2,12 +2,14 @@ import express, { Request, Response } from "express";
 import dotenv from "dotenv";
 import { AddressInfo } from "net";
 import { IdGenerator } from "./services/IdGenerator";
-import { UserDatabase } from "./data/UserDatabase";
+import { UserDatabase, UserData } from "./data/UserDatabase";
 import { Authenticator } from "./services/Authenticator";
 import { HashManager } from "./services/HashManager";
 import { BaseDatabase } from "./data/BaseDataBase";
 import { RecipeDataBase } from "./data/RecipeDataBase";
 import moment from "moment";
+import { signUpEndpoint } from "./endpoints/signup";
+import { loginEndpoint } from "./endpoints/login";
 
 dotenv.config();
 
@@ -15,85 +17,10 @@ const app = express();
 
 app.use(express.json());
 
-app.post("/signup", async (req: Request, res: Response) => {
-  try {
-    if (req.body.name === "") {
-      throw new Error("Preencha o campo name");
-    }
+//**************************************************************************** */
+app.post("/signup", signUpEndpoint ) 
 
-    if (!req.body.email || req.body.email.indexOf("@") === -1) {
-      throw new Error("Invalid email");
-    }
-
-    if (!req.body.password || req.body.password.length < 6) {
-      throw new Error("Invalid password");
-    }
-
-    const userData = {
-      email: req.body.email,
-      name: req.body.name,
-      password: req.body.password,
-    };
-
-    const idGenerator = new IdGenerator();
-    const id = idGenerator.generate();
-
-    const hashManager = new HashManager();
-    const hashPassword = await hashManager.hash(userData.password);
-
-    const userDb = new UserDatabase();
-    await userDb.createUser(id, userData.email, userData.name, hashPassword);
-
-    const authenticator = new Authenticator();
-    const token = authenticator.generateToken({
-      id,
-    });
-
-    res.status(200).send({
-      access_token: token,
-    });
-  } catch (err) {
-    res.status(400).send({
-      message: err.message,
-    });
-  }
-  await BaseDatabase.destroyConnection();
-});
-
-app.post("/login", async (req: Request, res: Response) => {
-  try {
-    if (!req.body.email || req.body.email.indexOf("@") === -1) {
-      throw new Error("Invalid email");
-    }
-
-    const userData = {
-      email: req.body.email,
-      name: req.body.name,
-      password: req.body.password,
-    };
-
-    const userDatabase = new UserDatabase();
-    const user = await userDatabase.getUserByEmail(userData.email);
-
-    if (user.password !== userData.password) {
-      throw new Error("Invalid password");
-    }
-
-    const authenticator = new Authenticator();
-    const token = authenticator.generateToken({
-      id: user.id,
-    });
-
-    res.status(200).send({
-      token,
-    });
-  } catch (err) {
-    res.status(400).send({
-      message: err.message,
-    });
-  }
-  await BaseDatabase.destroyConnection();
-});
+app.post("/login", loginEndpoint ) 
 
 app.post("/user/follow", async (req: Request, res: Response) => {
   try {
@@ -106,8 +33,21 @@ app.post("/user/follow", async (req: Request, res: Response) => {
     const follower = authenticator.getData(token);
 
     const userDatabase = new UserDatabase();
-    await userDatabase.followUserById(userToFollowId.id, follower.id);
+    const already = await userDatabase.getfollowUserById(userToFollowId.id, follower.id)
 
+    if(userToFollowId.id === follower.id || !token || userToFollowId.id === "") {
+
+      throw new Error("Invalid");
+
+    }
+    if(already > 0) {
+
+      throw new Error("Você já segue");
+    }
+
+   console.log(already)
+   await userDatabase.followUserById(userToFollowId.id, follower.id);
+ 
     res.status(200).send({
       message: "Followed successfully",
     });
@@ -161,6 +101,7 @@ app.get("/user/profile", async (req: Request, res: Response) => {
       id: user.id,
       name: user.name,
       email: user.email,
+      role:authenticationData.role
     });
   } catch (err) {
     res.status(400).send({
@@ -169,6 +110,47 @@ app.get("/user/profile", async (req: Request, res: Response) => {
   }
   await BaseDatabase.destroyConnection();
 });
+app.delete("/delete/user", async(req:Request,res:Response) => {
+
+  try {
+    const token = req.headers.authorization as string
+    const idDelete = req.params.id
+    
+    const authenticator = new Authenticator();
+    const verifiedToken = authenticator.getData(token)
+
+    const userData =  new UserDatabase()
+    await userData.getUserById(idDelete)
+
+    if(verifiedToken.role !== "admin") {
+
+      res.status(401).send({message: "Você não está autorizado a fazer isso"})
+
+    } else if(!userData) {
+
+      res.status(400).send({message: "Usuário não existe"})
+
+    } else {
+
+      const recipeDb = new RecipeDataBase();
+
+      await recipeDb.deleteRecipeAuthor(idDelete) 
+
+      await userData.deleteFollow(idDelete)
+
+      await userData.deleteUser(idDelete)
+
+      res.status(200).send({message:"Usuário deletado com sucesso!"})
+
+    }
+    
+  } catch(error) {
+
+    res.status(400).send({message: error.message || error.mysqlmessage});
+
+  }
+  await BaseDatabase.destroyConnection();
+})
 
 app.get("/recipe/:id", async (req: Request, res: Response) => {
   try {
@@ -218,47 +200,7 @@ app.get("/recipe/:id", async (req: Request, res: Response) => {
   await BaseDatabase.destroyConnection();
 });
 */
-/*app.post("/recipe", async (req: Request, res: Response) => {
-  try {
-    const token = req.headers.authorization as string;
-
-    const { title, description } = req.body;
-
-    const createDate = moment().format("YYYY-MM-DD");
-
-    const idGenerator = new IdGenerator();
-    const id = idGenerator.generate();
-
-    const authenticator = new Authenticator();
-    authenticator.getData(token);
-
-    const recipeDb = new RecipeDataBase();
-    const recipe = await recipeDb.createRecipe(
-      id,
-      title,
-      description,
-      createDate
-    );
-
-    if (!title || !description) {
-      res.status(400).send({
-        message: "Preencha todos os campos",
-      });
-    } else {
-      res.status(200).send({
-        title: title,
-        description: description,
-        createDate: createDate,
-      });
-    }
-  } catch (error) {
-    res.status(400).send({
-      message: error.message,
-    });
-  }
-  await BaseDatabase.destroyConnection();
-});
-*/
+ 
 app.post("/recipe", async (req: Request, res: Response) => {
   try {
       const token = req.headers.authorization as string;
@@ -292,7 +234,65 @@ app.post("/recipe", async (req: Request, res: Response) => {
       res.status(400).send({message: err.message || err.mysqlmessage })
   }
 })
+app.get("/updateRecipe", async(req:Request, res:Response) => {
 
+  try {
+
+    const token = req.headers.authorization as string
+    const idUser = new Authenticator().getData(token)
+
+    const idRecipe = req.body.id
+    const {newTitle, newDescription} = req.body
+
+    const recipeToUpdate = await new RecipeDataBase().getRecipeById(idRecipe)
+
+    if(recipeToUpdate.author_id !== idUser.id || idUser.role !== "normal") {
+      
+      res.status(401).send({ message: "Não autorizado"});
+
+    }
+
+    await new RecipeDataBase().updateRecipe(idRecipe, newTitle, newDescription)
+    
+    res.status(200).send({ message:
+      newTitle,
+      newDescription
+    });
+  } catch(err) {
+
+    res.status(400).send({message: err.message || err.mysqlmessage});
+
+  }
+
+})
+app.delete("/delete/recipe", async(req:Request, res:Response) => {
+
+  try { 
+    const idDelete = req.body.id;
+    const token = req.headers.authorization as string;
+
+    const authenticator = new Authenticator();
+    const tokenData = authenticator.getData(token);
+
+    const recipeData = await new RecipeDataBase().getRecipeById(idDelete)
+
+    if(recipeData.author_id !== tokenData.id && tokenData.role === "normal") {
+
+      res.status(401).send({ message: "Não autorizado"});
+
+    }
+
+    await new RecipeDataBase().deleteRecipe(idDelete)
+
+    res.status(200).send({message:"Receita deletada com sucesso!"})
+
+  } catch(err) {
+
+    res.status(400).send({ message: err.message || err.mysqlmessage });
+
+  }
+
+})
 app.get("/users/feed", async(req:Request, res:Response) => {
 
   try {
@@ -308,7 +308,8 @@ app.get("/users/feed", async(req:Request, res:Response) => {
   } catch(err) {
     res.status(400).send({message: err.message || err.mysqlmessage })
   }
-
+  
+  await BaseDatabase.destroyConnection();
 
 })
 const server = app.listen(process.env.PORT || 3003, () => {

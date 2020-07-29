@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import dotenv from "dotenv";
 import { AddressInfo } from "net";
 import { IdGenerator } from "./services/IdGenerator";
-import { UserDatabase, UserData } from "./data/UserDatabase";
+import { UserDatabase } from "./data/UserDatabase";
 import { Authenticator } from "./services/Authenticator";
 import { HashManager } from "./services/HashManager";
 import { BaseDatabase } from "./data/BaseDataBase";
@@ -10,12 +10,19 @@ import { RecipeDataBase } from "./data/RecipeDataBase";
 import moment from "moment";
 import { signUpEndpoint } from "./endpoints/signup";
 import { loginEndpoint } from "./endpoints/login";
+import cors from "cors";
+
+//https://polnb1x533.execute-api.us-east-1.amazonaws.com/dev
 
 dotenv.config();
 
 const app = express();
 
 app.use(express.json());
+
+app.use(cors({origin: true}))
+
+export default app
 
 //**************************************************************************** */
 app.post("/signup", signUpEndpoint ) 
@@ -110,7 +117,7 @@ app.get("/user/profile", async (req: Request, res: Response) => {
   }
   await BaseDatabase.destroyConnection();
 });
-app.delete("/delete/user", async(req:Request,res:Response) => {
+app.delete("/delete/:idUser", async(req:Request,res:Response) => {
 
   try {
     const token = req.headers.authorization as string
@@ -120,9 +127,9 @@ app.delete("/delete/user", async(req:Request,res:Response) => {
     const verifiedToken = authenticator.getData(token)
 
     const userData =  new UserDatabase()
-    await userData.getUserById(idDelete)
+    const user = await userData.getUserById(idDelete)
 
-    if(verifiedToken.role !== "admin") {
+    if(verifiedToken.role !== "admin" ||( user.author_id !== verifiedToken.id && verifiedToken.role !== "admin")) {
 
       res.status(401).send({message: "Você não está autorizado a fazer isso"})
 
@@ -312,11 +319,16 @@ app.get("/users/feed", async(req:Request, res:Response) => {
   await BaseDatabase.destroyConnection();
 
 })
-const server = app.listen(process.env.PORT || 3003, () => {
-  if (server) {
-    const address = server.address() as AddressInfo;
-    console.log(`Server is running in http://localhost:${address.port}`);
-  } else {
-    console.error(`Failure upon starting server.`);
-  }
-});
+
+if(process.env.NODE_ENV !== "serveless") {
+  const server = app.listen(process.env.PORT || 3000, () => {
+      if(server) {
+          const address = server.address() as AddressInfo
+          console.log(`Server is running in http://localhost:${address.port}`)
+      } else {
+          console.log(`Failure`)
+      }
+  })  
+}
+
+
